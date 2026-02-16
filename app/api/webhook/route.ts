@@ -96,9 +96,9 @@ export async function POST(req: Request) {
                 maxTokens: 1024,
             });
             aiResponseText = text;
-        } catch (aiError) {
+        } catch (aiError: any) {
             console.error("Erro na Geração da IA:", aiError);
-            if (logId) await supabase.from('webhook_logs').update({ status: 'error_ai_generation', payload: { ...body, error: aiError.message } }).eq('id', logId);
+            if (logId) await supabase.from('webhook_logs').update({ status: 'error_ai_generation', payload: { ...body, error: aiError.message || String(aiError) } }).eq('id', logId);
             return NextResponse.json({ error: "AI Generation Failed" }, { status: 500 });
         }
 
@@ -182,10 +182,10 @@ export async function POST(req: Request) {
         }
 
         return NextResponse.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
         console.error("Erro no Webhook:", error);
         // Tenta logar o erro geral se possível, mas sem acesso ao ID do log original se falhou antes
-        await supabase.from('webhook_logs').insert({ payload: { error: error.message }, status: 'critical_error' });
+        await supabase.from('webhook_logs').insert({ payload: { error: error.message || String(error) }, status: 'critical_error' });
         return NextResponse.json({ error: "Internal Error" }, { status: 500 });
     }
 }
