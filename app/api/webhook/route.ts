@@ -53,6 +53,9 @@ export async function POST(req: Request) {
             apiKey: config.groq_api_key,
         });
 
+        // Debug Log
+        console.log("Chamando Groq AI para:", userMessage);
+
         const systemPrompt = `Você é um assistente de vendas da ADV Digital. 
             Seu objetivo é coletar dados para criar um site jurídico em 48h.
             Colete os seguintes dados:
@@ -85,6 +88,8 @@ export async function POST(req: Request) {
             temperature: 1,
             maxTokens: 8192,
         });
+
+        console.log("Resposta IA:", aiText);
 
         // 4. Salvar histórico (usa 'model' para manter compatibilidade com banco existente)
         await supabase.from('mensagens').insert([
@@ -134,7 +139,9 @@ export async function POST(req: Request) {
         // 5. Responder via Evolution API (com delay)
         const evolutionUrl = `${config?.evolution_api_url}/message/sendText/${config?.evolution_instance}`;
 
-        await fetch(evolutionUrl, {
+        console.log("Enviando para Evolution:", evolutionUrl);
+
+        const evoResponse = await fetch(evolutionUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -146,6 +153,13 @@ export async function POST(req: Request) {
                 delay: 1200 // Atraso de 1.2s para parecer digitação humana
             })
         });
+
+        if (!evoResponse.ok) {
+            const errorText = await evoResponse.text();
+            console.error("Erro Evolution API:", errorText);
+        } else {
+            console.log("Envio Evolution OK");
+        }
 
         return NextResponse.json({ success: true });
     } catch (error) {
