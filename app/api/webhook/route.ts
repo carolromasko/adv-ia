@@ -15,10 +15,14 @@ export async function POST(req: Request) {
 
 
         // 0. Log request for debugging
-        await supabase.from('webhook_logs').insert({ payload: body, status: 'received' });
+        const { data: logData } = await supabase.from('webhook_logs').insert({ payload: body, status: 'received' }).select().single();
+        const logId = logData?.id;
 
         // 1. Validar se é uma mensagem recebida da Evolution API
-        if (body.event !== "messages.upsert") return NextResponse.json({ ok: true });
+        if (body.event !== "messages.upsert") {
+            if (logId) await supabase.from('webhook_logs').update({ status: 'ignored_event' }).eq('id', logId);
+            return NextResponse.json({ ok: true });
+        }
 
         const messageData = body.data.messages[0];
         if (messageData.key.fromMe) return NextResponse.json({ ok: true });
@@ -33,6 +37,7 @@ export async function POST(req: Request) {
 
         if (!config?.groq_api_key) {
             console.error("Groq API Key não configurada.");
+            if (logId) await supabase.from('webhook_logs').update({ status: 'error_no_api_key' }).eq('id', logId);
             return NextResponse.json({ error: "API Key missing" }, { status: 500 });
         }
 
@@ -78,32 +83,45 @@ export async function POST(req: Request) {
             }
             `;
 
-        const { text: aiText } = await generateText({
-            model: groq('openai/gpt-oss-120b'),
-            system: systemPrompt,
-            messages: [
-                ...formattedHistory,
-                { role: 'user', content: userMessage }
-            ],
-            temperature: 1,
-            maxTokens: 8192,
-        });
+        let aiResponseText = "";
+        try {
+            const { text } = await generateText({
+                model: groq('openai/gpt-oss-120b'),
+                system: systemPrompt,
+                messages: [
+                    ...formattedHistory, // Histórico formatado
+                    { role: 'user', content: userMessage }
+                ],
+                temperature: 0.7, // Reduzi um pouco a temperatura para ser mais focado
+                maxTokens: 1024,
+            });
+            aiResponseText = text;
+        } catch (aiError) {
+            console.error("Erro na Geração da IA:", aiError);
+            if (logId) await supabase.from('webhook_logs').update({ status: 'error_ai_generation', payload: { ...body, error: aiError.message } }).eq('id', logId);
+            return NextResponse.json({ error: "AI Generation Failed" }, { status: 500 });
+        }
 
-        console.log("Resposta IA:", aiText);
+        console.log("Resposta IA:", aiResponseText);
+
+        // Atualiza log com sucesso da IA
+        if (logId) await supabase.from('webhook_logs').update({ status: 'ai_generated' }).eq('id', logId);
+
+
 
         // 4. Salvar histórico (usa 'model' para manter compatibilidade com banco existente)
         await supabase.from('mensagens').insert([
             { whatsapp_id: whatsappId, role: 'user', content: userMessage },
-            { whatsapp_id: whatsappId, role: 'model', content: aiText }
+            { whatsapp_id: whatsappId, role: 'model', content: aiResponseText }
         ]);
 
-        let responseText = aiText;
+        let responseText = aiResponseText;
 
         // Lógica de Extração e Salvamento Inteligente
-        if (aiText.includes("[FINALIZADO]") || aiText.includes("{")) {
+        if (aiResponseText.includes("[FINALIZADO]") || aiResponseText.includes("{")) {
             try {
                 // Tenta extrair JSON (mesmo com texto ao redor)
-                const jsonMatch = aiText.match(/\{[\s\S]*\}/);
+                const jsonMatch = aiResponseText.match(/\{[\s\S]*\}/);
                 if (jsonMatch) {
                     const jsonString = jsonMatch[0];
                     const leadData = JSON.parse(jsonString);
@@ -120,7 +138,7 @@ export async function POST(req: Request) {
                     }, { onConflict: 'whatsapp_id' });
 
                     // Limpa a resposta para o usuário (remove o JSON)
-                    responseText = aiText.replace(jsonString, "").replace("[FINALIZADO]", "").trim();
+                    responseText = aiResponseText.replace(jsonString, "").replace("[FINALIZADO]", "").trim();
                     if (!responseText) responseText = "Obrigado! Recebi todos os seus dados. Nossa equipe entrará em contato em breve.";
                 }
             } catch (jsonError) {
@@ -157,13 +175,17 @@ export async function POST(req: Request) {
         if (!evoResponse.ok) {
             const errorText = await evoResponse.text();
             console.error("Erro Evolution API:", errorText);
+            if (logId) await supabase.from('webhook_logs').update({ status: 'error_evolution_api', payload: { ...body, evolution_error: errorText } }).eq('id', logId);
         } else {
             console.log("Envio Evolution OK");
+            if (logId) await supabase.from('webhook_logs').update({ status: 'sent_to_user' }).eq('id', logId);
         }
 
         return NextResponse.json({ success: true });
     } catch (error) {
         console.error("Erro no Webhook:", error);
+        // Tenta logar o erro geral se possível, mas sem acesso ao ID do log original se falhou antes
+        await supabase.from('webhook_logs').insert({ payload: { error: error.message }, status: 'critical_error' });
         return NextResponse.json({ error: "Internal Error" }, { status: 500 });
     }
 }
