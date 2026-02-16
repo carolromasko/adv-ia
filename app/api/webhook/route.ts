@@ -24,7 +24,15 @@ export async function POST(req: Request) {
             return NextResponse.json({ ok: true });
         }
 
-        const messageData = body.data.messages[0];
+        // Tenta extrair a mensagem de maneiras diferentes (array ou objeto direto)
+        const messageData = body.data.messages?.[0] || body.data;
+
+        if (!messageData || !messageData.key) {
+            console.log("Estrutura de mensagem inválida ou evento ignorado.");
+            if (logId) await supabase.from('webhook_logs').update({ status: 'ignored_event' }).eq('id', logId);
+            return NextResponse.json({ ok: true });
+        }
+
         if (messageData.key.fromMe) return NextResponse.json({ ok: true });
 
         const whatsappId = messageData.key.remoteJid;
