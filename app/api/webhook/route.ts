@@ -165,7 +165,16 @@ export async function POST(req: Request) {
         // 5. Responder via Evolution API (com delay)
         const evolutionUrl = `${config?.evolution_api_url}/message/sendText/${config?.evolution_instance}`;
 
-        console.log("Enviando para Evolution:", evolutionUrl);
+        // Remover sufixo do número se existir, para garantir compatibilidade
+        const number = whatsappId.replace('@s.whatsapp.net', '');
+
+        const evoBody = {
+            number: number,
+            text: responseText || "Recebido.",
+            delay: 1200
+        };
+
+        console.log("Enviando para Evolution:", evolutionUrl, evoBody);
 
         const evoResponse = await fetch(evolutionUrl, {
             method: 'POST',
@@ -173,20 +182,16 @@ export async function POST(req: Request) {
                 'Content-Type': 'application/json',
                 'apikey': config?.evolution_api_key || ""
             },
-            body: JSON.stringify({
-                number: whatsappId,
-                text: responseText || "Recebido.",
-                delay: 1200 // Atraso de 1.2s para parecer digitação humana
-            })
+            body: JSON.stringify(evoBody)
         });
 
         if (!evoResponse.ok) {
             const errorText = await evoResponse.text();
             console.error("Erro Evolution API:", errorText);
-            if (logId) await supabase.from('webhook_logs').update({ status: 'error_evolution_api', payload: { ...body, evolution_error: errorText } }).eq('id', logId);
+            if (logId) await supabase.from('webhook_logs').update({ status: 'error_evolution_api', payload: { ...body, evolution_payload: evoBody, evolution_error: errorText } }).eq('id', logId);
         } else {
             console.log("Envio Evolution OK");
-            if (logId) await supabase.from('webhook_logs').update({ status: 'sent_to_user' }).eq('id', logId);
+            if (logId) await supabase.from('webhook_logs').update({ status: 'sent_to_user', payload: { ...body, evolution_payload: evoBody } }).eq('id', logId);
         }
 
         return NextResponse.json({ success: true });
