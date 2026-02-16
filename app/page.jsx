@@ -258,7 +258,7 @@ const App = () => {
                 </header>
 
                 <main className="p-10 overflow-y-auto">
-                    {activeTab === 'dashboard' ? (
+                    {activeTab === 'dashboard' && (
                         <div className="space-y-8">
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                 <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
@@ -425,56 +425,57 @@ const App = () => {
                                 </div>
                             </div>
                         </div>
-                    )}
+                </div>
+            )}
 
 
 
-                    {activeTab === 'webhooks' && (
-                        <div className="space-y-6">
-                            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex justify-between items-center">
-                                <div>
-                                    <h2 className="text-xl font-bold text-slate-800">Logs de Recebimento</h2>
-                                    <p className="text-sm text-slate-500">Monitoramento em tempo real das mensagens recebidas da Evolution API.</p>
-                                </div>
-                                <button onClick={fetchWebhookLogs} className="p-2 hover:bg-slate-100 rounded-lg text-slate-500 transition">
-                                    <RefreshCw size={20} />
-                                </button>
-                            </div>
-
-                            <div className="space-y-4">
-                                {webhookLogs.map((log) => (
-                                    <div key={log.id} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                                        <div className="flex justify-between items-start mb-4">
-                                            <div className="flex items-center gap-3">
-                                                <div className="bg-blue-50 text-blue-600 p-2 rounded-lg">
-                                                    <MessageSquare size={16} />
-                                                </div>
-                                                <div>
-                                                    <div className="text-xs font-bold text-slate-400 uppercase">ID: {log.id}</div>
-                                                    <div className="text-sm font-bold text-slate-700">{formatDate(log.created_at)}</div>
-                                                </div>
-                                            </div>
-                                            <span className="px-3 py-1 bg-green-50 text-green-700 rounded-full text-[10px] font-bold uppercase border border-green-200">
-                                                {log.status}
-                                            </span>
-                                        </div>
-                                        <div className="bg-slate-900 rounded-xl p-4 overflow-x-auto">
-                                            <pre className="text-xs text-green-400 font-mono">
-                                                {JSON.stringify(log.payload, null, 2)}
-                                            </pre>
-                                        </div>
-                                    </div>
-                                ))}
-
-                                {webhookLogs.length === 0 && (
-                                    <div className="text-center py-20 text-slate-400">
-                                        Nenhum log registrado ainda.
-                                    </div>
-                                )}
-                            </div>
+            {activeTab === 'webhooks' && (
+                <div className="space-y-6">
+                    <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex justify-between items-center">
+                        <div>
+                            <h2 className="text-xl font-bold text-slate-800">Logs de Recebimento</h2>
+                            <p className="text-sm text-slate-500">Monitoramento em tempo real das mensagens recebidas da Evolution API.</p>
                         </div>
-                    )}
-                </main>
+                        <button onClick={fetchWebhookLogs} className="p-2 hover:bg-slate-100 rounded-lg text-slate-500 transition">
+                            <RefreshCw size={20} />
+                        </button>
+                    </div>
+
+                    <div className="space-y-4">
+                        {webhookLogs.map((log) => (
+                            <div key={log.id} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                                <div className="flex justify-between items-start mb-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className="bg-blue-50 text-blue-600 p-2 rounded-lg">
+                                            <MessageSquare size={16} />
+                                        </div>
+                                        <div>
+                                            <div className="text-xs font-bold text-slate-400 uppercase">ID: {log.id}</div>
+                                            <div className="text-sm font-bold text-slate-700">{formatDate(log.created_at)}</div>
+                                        </div>
+                                    </div>
+                                    <span className="px-3 py-1 bg-green-50 text-green-700 rounded-full text-[10px] font-bold uppercase border border-green-200">
+                                        {log.status}
+                                    </span>
+                                </div>
+                                <div className="bg-slate-900 rounded-xl p-4 overflow-x-auto">
+                                    <pre className="text-xs text-green-400 font-mono">
+                                        {JSON.stringify(log.payload, null, 2)}
+                                    </pre>
+                                </div>
+                            </div>
+                        ))}
+
+                        {webhookLogs.length === 0 && (
+                            <div className="text-center py-20 text-slate-400">
+                                Nenhum log registrado ainda.
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+        </main>
             </div >
         </div >
     );
