@@ -1,3 +1,4 @@
+"use client";
 import React, { useState, useEffect } from 'react';
 import {
     Users, Settings, Globe, CheckCircle, Clock, Search, Save,
@@ -187,8 +188,8 @@ const App = () => {
                                                         </td>
                                                         <td className="px-8 py-5 text-sm">
                                                             <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase ${l.status === 'Briefing Concluído'
-                                                                    ? 'bg-green-50 text-green-700'
-                                                                    : 'bg-amber-50 text-amber-700'
+                                                                ? 'bg-green-50 text-green-700'
+                                                                : 'bg-amber-50 text-amber-700'
                                                                 }`}>
                                                                 {l.status}
                                                             </span>
