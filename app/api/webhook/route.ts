@@ -13,6 +13,10 @@ export async function POST(req: Request) {
     try {
         const body = await req.json();
 
+
+        // 0. Log request for debugging
+        await supabase.from('webhook_logs').insert({ payload: body, status: 'received' });
+
         // 1. Validar se é uma mensagem recebida da Evolution API
         if (body.event !== "messages.upsert") return NextResponse.json({ ok: true });
 
@@ -50,26 +54,26 @@ export async function POST(req: Request) {
         });
 
         const systemPrompt = `Você é um assistente de vendas da ADV Digital. 
-    Seu objetivo é coletar dados para criar um site jurídico em 48h.
-    Colete os seguintes dados:
-    1. Nome do Advogado
-    2. Nome do Escritório
-    3. Especialidades
-    4. Principal Diferencial
-
-    Seja formal, mas prestativo. Pergunte uma coisa por vez.
-    
-    IMPORTANTE:
-    Quando o usuário fornecer todos os 4 pontos acima, você DEVE retornar APENAS O SEGUINTE JSON no final da sua resposta, sem markdown (backticks):
-    
-    [FINALIZADO]
-    {
-        "nome_advogado": "Nome...",
-        "nome_escritorio": "Escritório...",
-        "especialidades": "Áreas...",
-        "diferencial": "Texto do diferencial..."
-    }
-    `;
+            Seu objetivo é coletar dados para criar um site jurídico em 48h.
+            Colete os seguintes dados:
+            1. Nome do Advogado
+            2. Nome do Escritório
+            3. Especialidades
+            4. Principal Diferencial
+        
+            Seja formal, mas prestativo. Pergunte uma coisa por vez.
+            
+            IMPORTANTE:
+            Quando o usuário fornecer todos os 4 pontos acima, você DEVE retornar APENAS O SEGUINTE JSON no final da sua resposta, sem markdown (backticks):
+            
+            [FINALIZADO]
+            {
+                "nome_advogado": "Nome...",
+                "nome_escritorio": "Escritório...",
+                "especialidades": "Áreas...",
+                "diferencial": "Texto do diferencial..."
+            }
+            `;
 
         const { text: aiText } = await generateText({
             model: groq('openai/gpt-oss-120b'),
@@ -127,13 +131,20 @@ export async function POST(req: Request) {
             }, { onConflict: 'whatsapp_id', ignoreDuplicates: true });
         }
 
-        // 5. Responder via Evolution API
+        // 5. Responder via Evolution API (com delay)
         const evolutionUrl = `${config?.evolution_api_url}/message/sendText/${config?.evolution_instance}`;
 
         await fetch(evolutionUrl, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'apikey': config?.evolution_api_key || "" },
-            body: JSON.stringify({ number: whatsappId, text: responseText || "Recebido." })
+            headers: {
+                'Content-Type': 'application/json',
+                'apikey': config?.evolution_api_key || ""
+            },
+            body: JSON.stringify({
+                number: whatsappId,
+                text: responseText || "Recebido.",
+                delay: 1200 // Atraso de 1.2s para parecer digitação humana
+            })
         });
 
         return NextResponse.json({ success: true });
