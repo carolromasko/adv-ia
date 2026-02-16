@@ -16,7 +16,7 @@ const App = () => {
     const [loading, setLoading] = useState(false);
     const [leads, setLeads] = useState([]);
     const [config, setConfig] = useState({
-        gemini_api_key: '',
+        groq_api_key: '',
         evolution_api_url: '',
         evolution_api_key: '',
         evolution_instance: '',
@@ -51,7 +51,7 @@ const App = () => {
 
         if (data) {
             setConfig({
-                gemini_api_key: data.gemini_api_key || '',
+                groq_api_key: data.groq_api_key || '',
                 evolution_api_url: data.evolution_api_url || '',
                 evolution_api_key: data.evolution_api_key || '',
                 evolution_instance: data.evolution_instance || '',
@@ -213,13 +213,13 @@ const App = () => {
                                     <h2 className="text-xl font-bold mb-2 flex items-center gap-2">
                                         <Zap className="text-amber-500" size={20} /> Integração IA
                                     </h2>
-                                    <p className="text-slate-400 text-sm mb-6">Configure sua chave do Google Gemini para processar as mensagens do WhatsApp.</p>
-                                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2 tracking-widest">Gemini API Key</label>
+                                    <p className="text-slate-400 text-sm mb-6">Configure sua chave da Groq Cloud para processar as mensagens do WhatsApp (Modelo: openai/gpt-oss-120b).</p>
+                                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2 tracking-widest">Groq API Key</label>
                                     <input
                                         type="password"
-                                        value={config.gemini_api_key}
-                                        onChange={(e) => setConfig({ ...config, gemini_api_key: e.target.value })}
-                                        placeholder="AIza..."
+                                        value={config.groq_api_key}
+                                        onChange={(e) => setConfig({ ...config, groq_api_key: e.target.value })}
+                                        placeholder="gsk_..."
                                         className="w-full bg-slate-800 border-none rounded-xl px-4 py-4 text-white focus:ring-2 focus:ring-amber-500 transition outline-none"
                                     />
                                 </div>
