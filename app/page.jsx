@@ -328,154 +328,153 @@ const App = () => {
                                 )}
                             </div>
                         </div>
+                    )}
+
+                    {activeTab === 'integrations' && (
+                        <div className="max-w-3xl mx-auto space-y-6">
+                            <div className="bg-slate-900 text-white p-8 rounded-3xl shadow-2xl space-y-8">
+                                <div>
+                                    <h2 className="text-xl font-bold mb-2 flex items-center gap-2">
+                                        <Zap className="text-amber-500" size={20} /> Integração IA
+                                    </h2>
+                                    <p className="text-slate-400 text-sm mb-6">Configure sua chave da Groq Cloud para processar as mensagens do WhatsApp (Modelo: openai/gpt-oss-120b).</p>
+                                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2 tracking-widest">Groq API Key</label>
+                                    <input
+                                        type="password"
+                                        value={config.groq_api_key}
+                                        onChange={(e) => setConfig({ ...config, groq_api_key: e.target.value })}
+                                        placeholder="gsk_..."
+                                        className="w-full bg-slate-800 border-none rounded-xl px-4 py-4 text-white focus:ring-2 focus:ring-amber-500 transition outline-none"
+                                    />
+                                </div>
+
+                                <div className="pt-8 border-t border-slate-800">
+                                    <h2 className="text-xl font-bold mb-2 flex items-center gap-2">
+                                        <MessageSquare className="text-blue-500" size={20} /> Evolution API
+                                    </h2>
+
+                                    {/* Webhook URL Display */}
+                                    <div className="mt-6 mb-8 p-4 bg-blue-500/10 rounded-xl border border-blue-500/20">
+                                        <label className="block text-[10px] font-bold text-blue-400 uppercase mb-2 tracking-widest flex items-center gap-2">
+                                            <Globe size={12} /> URL do Webhook (Copie e cole na Evolution)
+                                        </label>
+                                        <div className="flex gap-2">
+                                            <input
+                                                readOnly
+                                                value={webhookUrl}
+                                                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-slate-300 font-mono text-sm focus:outline-none focus:border-blue-500 transaction"
+                                            />
+                                            <button
+                                                onClick={() => {
+                                                    navigator.clipboard.writeText(webhookUrl);
+                                                    alert("URL copiada!");
+                                                }}
+                                                className="bg-blue-600 hover:bg-blue-500 text-white px-4 rounded-lg transition flex items-center justify-center"
+                                                title="Copiar URL"
+                                            >
+                                                <Copy size={18} />
+                                            </button>
+                                        </div>
+                                        <p className="text-[11px] text-slate-400 mt-2">
+                                            Configure esta URL no campo <strong>webhook.url</strong> da sua instância e habilite os eventos <strong>MESSAGES_UPSERT</strong>.
+                                        </p>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="md:col-span-2">
+                                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2 tracking-widest">URL do Servidor</label>
+                                            <input
+                                                type="text"
+                                                value={config.evolution_api_url}
+                                                onChange={(e) => setConfig({ ...config, evolution_api_url: e.target.value })}
+                                                placeholder="https://sua-api.com"
+                                                className="w-full bg-slate-800 border-none rounded-xl px-4 py-4 text-white focus:ring-2 focus:ring-amber-500 transition outline-none"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2 tracking-widest">Nome da Instância</label>
+                                            <input
+                                                type="text"
+                                                value={config.evolution_instance}
+                                                onChange={(e) => setConfig({ ...config, evolution_instance: e.target.value })}
+                                                className="w-full bg-slate-800 border-none rounded-xl px-4 py-4 text-white focus:ring-2 focus:ring-amber-500 transition outline-none"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2 tracking-widest">API Key Global</label>
+                                            <input
+                                                type="password"
+                                                value={config.evolution_api_key}
+                                                onChange={(e) => setConfig({ ...config, evolution_api_key: e.target.value })}
+                                                className="w-full bg-slate-800 border-none rounded-xl px-4 py-4 text-white focus:ring-2 focus:ring-amber-500 transition outline-none"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="pt-10 flex items-center justify-between">
+                                    <span className={`text-sm font-bold ${saveStatus.includes('Erro') ? 'text-red-500' : 'text-green-500'}`}>{saveStatus}</span>
+                                    <button
+                                        onClick={handleSaveConfig}
+                                        disabled={loading}
+                                        className="bg-amber-500 text-white px-10 py-4 rounded-2xl font-bold hover:bg-amber-600 transition flex items-center gap-2 shadow-lg shadow-amber-500/20 disabled:opacity-50"
+                                    >
+                                        {loading ? <RefreshCw className="animate-spin" size={20} /> : <Save size={20} />}
+                                        {loading ? 'Salvando...' : 'Salvar Tudo'}
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     )}
 
-            {activeTab === 'integrations' && (
-                <div className="max-w-3xl mx-auto space-y-6">
-                    <div className="bg-slate-900 text-white p-8 rounded-3xl shadow-2xl space-y-8">
-                        <div>
-                            <h2 className="text-xl font-bold mb-2 flex items-center gap-2">
-                                <Zap className="text-amber-500" size={20} /> Integração IA
-                            </h2>
-                            <p className="text-slate-400 text-sm mb-6">Configure sua chave da Groq Cloud para processar as mensagens do WhatsApp (Modelo: openai/gpt-oss-120b).</p>
-                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2 tracking-widest">Groq API Key</label>
-                            <input
-                                type="password"
-                                value={config.groq_api_key}
-                                onChange={(e) => setConfig({ ...config, groq_api_key: e.target.value })}
-                                placeholder="gsk_..."
-                                className="w-full bg-slate-800 border-none rounded-xl px-4 py-4 text-white focus:ring-2 focus:ring-amber-500 transition outline-none"
-                            />
-                        </div>
 
-                        <div className="pt-8 border-t border-slate-800">
-                            <h2 className="text-xl font-bold mb-2 flex items-center gap-2">
-                                <MessageSquare className="text-blue-500" size={20} /> Evolution API
-                            </h2>
 
-                            {/* Webhook URL Display */}
-                            <div className="mt-6 mb-8 p-4 bg-blue-500/10 rounded-xl border border-blue-500/20">
-                                <label className="block text-[10px] font-bold text-blue-400 uppercase mb-2 tracking-widest flex items-center gap-2">
-                                    <Globe size={12} /> URL do Webhook (Copie e cole na Evolution)
-                                </label>
-                                <div className="flex gap-2">
-                                    <input
-                                        readOnly
-                                        value={webhookUrl}
-                                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-slate-300 font-mono text-sm focus:outline-none focus:border-blue-500 transaction"
-                                    />
-                                    <button
-                                        onClick={() => {
-                                            navigator.clipboard.writeText(webhookUrl);
-                                            alert("URL copiada!");
-                                        }}
-                                        className="bg-blue-600 hover:bg-blue-500 text-white px-4 rounded-lg transition flex items-center justify-center"
-                                        title="Copiar URL"
-                                    >
-                                        <Copy size={18} />
-                                    </button>
+                    {activeTab === 'webhooks' && (
+                        <div className="space-y-6">
+                            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex justify-between items-center">
+                                <div>
+                                    <h2 className="text-xl font-bold text-slate-800">Logs de Recebimento</h2>
+                                    <p className="text-sm text-slate-500">Monitoramento em tempo real das mensagens recebidas da Evolution API.</p>
                                 </div>
-                                <p className="text-[11px] text-slate-400 mt-2">
-                                    Configure esta URL no campo <strong>webhook.url</strong> da sua instância e habilite os eventos <strong>MESSAGES_UPSERT</strong>.
-                                </p>
+                                <button onClick={fetchWebhookLogs} className="p-2 hover:bg-slate-100 rounded-lg text-slate-500 transition">
+                                    <RefreshCw size={20} />
+                                </button>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="md:col-span-2">
-                                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2 tracking-widest">URL do Servidor</label>
-                                    <input
-                                        type="text"
-                                        value={config.evolution_api_url}
-                                        onChange={(e) => setConfig({ ...config, evolution_api_url: e.target.value })}
-                                        placeholder="https://sua-api.com"
-                                        className="w-full bg-slate-800 border-none rounded-xl px-4 py-4 text-white focus:ring-2 focus:ring-amber-500 transition outline-none"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2 tracking-widest">Nome da Instância</label>
-                                    <input
-                                        type="text"
-                                        value={config.evolution_instance}
-                                        onChange={(e) => setConfig({ ...config, evolution_instance: e.target.value })}
-                                        className="w-full bg-slate-800 border-none rounded-xl px-4 py-4 text-white focus:ring-2 focus:ring-amber-500 transition outline-none"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2 tracking-widest">API Key Global</label>
-                                    <input
-                                        type="password"
-                                        value={config.evolution_api_key}
-                                        onChange={(e) => setConfig({ ...config, evolution_api_key: e.target.value })}
-                                        className="w-full bg-slate-800 border-none rounded-xl px-4 py-4 text-white focus:ring-2 focus:ring-amber-500 transition outline-none"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="pt-10 flex items-center justify-between">
-                            <span className={`text-sm font-bold ${saveStatus.includes('Erro') ? 'text-red-500' : 'text-green-500'}`}>{saveStatus}</span>
-                            <button
-                                onClick={handleSaveConfig}
-                                disabled={loading}
-                                className="bg-amber-500 text-white px-10 py-4 rounded-2xl font-bold hover:bg-amber-600 transition flex items-center gap-2 shadow-lg shadow-amber-500/20 disabled:opacity-50"
-                            >
-                                {loading ? <RefreshCw className="animate-spin" size={20} /> : <Save size={20} />}
-                                {loading ? 'Salvando...' : 'Salvar Tudo'}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-
-
-            {activeTab === 'webhooks' && (
-                <div className="space-y-6">
-                    <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex justify-between items-center">
-                        <div>
-                            <h2 className="text-xl font-bold text-slate-800">Logs de Recebimento</h2>
-                            <p className="text-sm text-slate-500">Monitoramento em tempo real das mensagens recebidas da Evolution API.</p>
-                        </div>
-                        <button onClick={fetchWebhookLogs} className="p-2 hover:bg-slate-100 rounded-lg text-slate-500 transition">
-                            <RefreshCw size={20} />
-                        </button>
-                    </div>
-
-                    <div className="space-y-4">
-                        {webhookLogs.map((log) => (
-                            <div key={log.id} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                                <div className="flex justify-between items-start mb-4">
-                                    <div className="flex items-center gap-3">
-                                        <div className="bg-blue-50 text-blue-600 p-2 rounded-lg">
-                                            <MessageSquare size={16} />
+                            <div className="space-y-4">
+                                {webhookLogs.map((log) => (
+                                    <div key={log.id} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                                        <div className="flex justify-between items-start mb-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="bg-blue-50 text-blue-600 p-2 rounded-lg">
+                                                    <MessageSquare size={16} />
+                                                </div>
+                                                <div>
+                                                    <div className="text-xs font-bold text-slate-400 uppercase">ID: {log.id}</div>
+                                                    <div className="text-sm font-bold text-slate-700">{formatDate(log.created_at)}</div>
+                                                </div>
+                                            </div>
+                                            <span className="px-3 py-1 bg-green-50 text-green-700 rounded-full text-[10px] font-bold uppercase border border-green-200">
+                                                {log.status}
+                                            </span>
                                         </div>
-                                        <div>
-                                            <div className="text-xs font-bold text-slate-400 uppercase">ID: {log.id}</div>
-                                            <div className="text-sm font-bold text-slate-700">{formatDate(log.created_at)}</div>
+                                        <div className="bg-slate-900 rounded-xl p-4 overflow-x-auto">
+                                            <pre className="text-xs text-green-400 font-mono">
+                                                {JSON.stringify(log.payload, null, 2)}
+                                            </pre>
                                         </div>
                                     </div>
-                                    <span className="px-3 py-1 bg-green-50 text-green-700 rounded-full text-[10px] font-bold uppercase border border-green-200">
-                                        {log.status}
-                                    </span>
-                                </div>
-                                <div className="bg-slate-900 rounded-xl p-4 overflow-x-auto">
-                                    <pre className="text-xs text-green-400 font-mono">
-                                        {JSON.stringify(log.payload, null, 2)}
-                                    </pre>
-                                </div>
-                            </div>
-                        ))}
+                                ))}
 
-                        {webhookLogs.length === 0 && (
-                            <div className="text-center py-20 text-slate-400">
-                                Nenhum log registrado ainda.
+                                {webhookLogs.length === 0 && (
+                                    <div className="text-center py-20 text-slate-400">
+                                        Nenhum log registrado ainda.
+                                    </div>
+                                )}
                             </div>
-                        )}
-                    </div>
-                </div>
-            )}
-        </main>
+                        </div>
+                    )}
+                </main>
             </div >
         </div >
     );
