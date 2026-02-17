@@ -47,6 +47,65 @@ export async function POST(req: Request) {
             return NextResponse.json({ ok: true });
         }
 
+        // SISTEMA DE BUFFER - Acumular mensagens por 12 segundos
+        const DEBOUNCE_SECONDS = 12;
+        const now = new Date();
+        const processAfter = new Date(now.getTime() + DEBOUNCE_SECONDS * 1000);
+
+        // Verificar buffer existente
+        const { data: existingBuffer } = await supabase
+            .from('message_buffer')
+            .select('*')
+            .eq('whatsapp_id', whatsappId)
+            .single();
+
+        if (existingBuffer) {
+            const shouldProcessNow = new Date(existingBuffer.should_process_after) <= now;
+
+            if (!shouldProcessNow) {
+                // Ainda não passou o tempo, acumular mensagem
+                const updatedMessages = [...(existingBuffer.messages || []), userMessage];
+                await supabase
+                    .from('message_buffer')
+                    .update({
+                        messages: updatedMessages,
+                        last_message_at: now,
+                        should_process_after: processAfter,
+                        updated_at: now
+                    })
+                    .eq('whatsapp_id', whatsappId);
+
+                console.log(`Mensagem adicionada ao buffer (${updatedMessages.length} total). Aguardando silêncio...`);
+                if (logId) await supabase.from('webhook_logs').update({ status: 'buffered', payload: { ...body, buffer_count: updatedMessages.length } }).eq('id', logId);
+                return NextResponse.json({ queued: true, buffer_count: updatedMessages.length });
+            } else {
+                // Passou o tempo, processar buffer + mensagem atual
+                const allMessages = [...(existingBuffer.messages || []), userMessage];
+                const combinedMessage = allMessages.join('\n\n');
+
+                console.log(`Processando ${allMessages.length} mensagens acumuladas do buffer`);
+
+                // Limpar buffer
+                await supabase.from('message_buffer').delete().eq('whatsapp_id', whatsappId);
+
+                // Usar mensagem combinada
+                userMessage = combinedMessage;
+                if (logId) await supabase.from('webhook_logs').update({ payload: { ...body, processed_buffer: allMessages.length } }).eq('id', logId);
+            }
+        } else {
+            // Primeiro registro, criar buffer
+            await supabase.from('message_buffer').insert({
+                whatsapp_id: whatsappId,
+                messages: [userMessage],
+                last_message_at: now,
+                should_process_after: processAfter
+            });
+
+            console.log("Primeira mensagem no buffer. Aguardando silêncio...");
+            if (logId) await supabase.from('webhook_logs').update({ status: 'buffered', payload: { ...body, buffer_count: 1 } }).eq('id', logId);
+            return NextResponse.json({ queued: true, buffer_count: 1 });
+        }
+
         // 2. Buscar Configurações e Histórico no Supabase
         if (logId) await supabase.from('webhook_logs').update({ status: 'fetching_data' }).eq('id', logId);
 
