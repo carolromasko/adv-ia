@@ -140,6 +140,30 @@ const App = () => {
         if (error) console.error("Erro ao buscar logs de IA:", error);
     };
 
+    const reativarIA = async (whatsappId) => {
+        if (!confirm('Tem certeza que deseja reativar a IA para este lead? Ela voltará a responder automaticamente.')) {
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/reativar-ia', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ whatsapp_id: whatsappId })
+            });
+
+            if (!response.ok) {
+                throw new Error('Erro ao reativar IA');
+            }
+
+            alert('IA reativada com sucesso! Ela voltará a responder automaticamente.');
+            fetchLeads(); // Atualizar lista
+        } catch (error) {
+            console.error('Erro ao reativar IA:', error);
+            alert('Erro ao reativar IA. Verifique o console.');
+        }
+    };
+
     const handleSaveConfig = async (e) => {
         e.preventDefault();
         setLoading(true);
@@ -389,7 +413,18 @@ const App = () => {
                                                             <div className="text-sm text-slate-700">{formatDate(lead.updated_at)}</div>
                                                         </div>
                                                     </div>
-                                                    <div className="mt-4 flex justify-end">
+                                                    <div className="mt-4 flex justify-end gap-2">
+                                                        {lead.ai_paused && (
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    reativarIA(lead.whatsapp_id);
+                                                                }}
+                                                                className="text-xs bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition flex items-center gap-2"
+                                                            >
+                                                                <RefreshCw size={14} /> Reativar IA
+                                                            </button>
+                                                        )}
                                                         <button
                                                             onClick={(e) => {
                                                                 e.stopPropagation();

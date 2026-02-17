@@ -15,6 +15,23 @@ const redis = new Redis({
     token: process.env.UPSTASH_REDIS_REST_TOKEN!,
 });
 
+// Converter Markdown para formatação WhatsApp
+function convertMarkdownToWhatsApp(text: string): string {
+    return text
+        // ** ou __ para *negrito*
+        .replace(/\*\*(.+?)\*\*/g, '*$1*')
+        .replace(/__(.+?)__/g, '*$1*')
+        // * ou _ para _itálico_
+        .replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '_$1_')
+        .replace(/(?<!_)_(?!_)(.+?)(?<!_)_(?!_)/g, '_$1_')
+        // ~~ para ~riscado~
+        .replace(/~~(.+?)~~/g, '~$1~')
+        // ` para `code`
+        .replace(/`(.+?)`/g, '```$1```')
+        // Remove # de headers
+        .replace(/^#{1,6}\s+(.+)$/gm, '*$1*');
+}
+
 export async function POST(req: Request) {
     try {
         const body = await req.json();
@@ -115,6 +132,18 @@ export async function POST(req: Request) {
 }
 
 async function processMessages(whatsappId: string, combinedMessage: string, logId: number | undefined, body: any) {
+    // Verificar se IA está pausada para este lead
+    const { data: leadData } = await supabase.from('leads')
+        .select('ai_paused')
+        .eq('whatsapp_id', whatsappId)
+        .single();
+
+    if (leadData?.ai_paused) {
+        console.log(`[AI] IA pausada para ${whatsappId} - não processando mensagem`);
+        if (logId) await supabase.from('webhook_logs').update({ status: 'ai_paused' }).eq('id', logId);
+        return;
+    }
+
     // Buscar configurações
     const { data: config } = await supabase.from('configuracoes').select('*').single();
     if (!config?.groq_api_key) {
@@ -324,8 +353,11 @@ Este é o seu comportamento completo e obrigatório.
                     nome_escritorio: leadData.nome_escritorio,
                     especialidades: leadData.especialidades,
                     diferencial: leadData.diferencial,
+                    ai_paused: true, // PAUSAR IA após briefing
                     updated_at: new Date()
                 }, { onConflict: 'whatsapp_id' });
+
+                console.log(`[AI] Briefing finalizado para ${whatsappId} - IA pausada automaticamente`);
 
                 responseText = aiResponseText.replace(jsonString, "").replace("[FINALIZADO]", "").trim();
                 if (!responseText) responseText = "Obrigado! Recebi todos os seus dados. Nossa equipe entrará em contato em breve.";
@@ -346,6 +378,9 @@ Este é o seu comportamento completo e obrigatório.
 
     const evolutionUrl = `${config?.evolution_api_url}/message/sendText/${config?.evolution_instance}`;
     const number = whatsappId.replace('@s.whatsapp.net', '');
+
+    // Converter Markdown para formatação WhatsApp antes de enviar
+    responseText = convertMarkdownToWhatsApp(responseText || "");
 
     const evoBody = {
         number: number,
