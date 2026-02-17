@@ -112,8 +112,8 @@ export async function POST(req: Request) {
 
         console.log("Resposta IA:", aiResponseText);
 
-        // Atualiza log com sucesso da IA
-        if (logId) await supabase.from('webhook_logs').update({ status: 'ai_generated' }).eq('id', logId);
+        // Atualiza log com sucesso da IA, salvando a resposta gerada para debug
+        if (logId) await supabase.from('webhook_logs').update({ status: 'ai_generated', payload: { ...body, ai_response: aiResponseText } }).eq('id', logId);
 
 
 

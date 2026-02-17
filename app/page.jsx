@@ -498,8 +498,8 @@ const App = () => {
 
                                                 <div className="flex flex-col items-end gap-2">
                                                     <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase border ${log.status === 'error_ai_generation' || log.status === 'error_evolution_api' ? 'bg-red-50 text-red-700 border-red-200' :
-                                                            log.status === 'sent_to_user' ? 'bg-green-50 text-green-700 border-green-200' :
-                                                                'bg-slate-50 text-slate-600 border-slate-200'
+                                                        log.status === 'sent_to_user' ? 'bg-green-50 text-green-700 border-green-200' :
+                                                            'bg-slate-50 text-slate-600 border-slate-200'
                                                         }`}>
                                                         {log.status}
                                                     </span>
@@ -509,6 +509,16 @@ const App = () => {
 
                                             {expandedLogs[log.id] && (
                                                 <div className="bg-slate-50 border-t border-slate-100 p-6 space-y-4">
+                                                    {(payload.ai_response || evolutionPayload.text) && (
+                                                        <div className="mb-4">
+                                                            <h4 className="text-xs font-bold text-amber-600 uppercase tracking-wider mb-2 flex items-center gap-2">
+                                                                <Zap size={14} /> Resposta Gerada pela IA
+                                                            </h4>
+                                                            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-slate-800 text-sm whitespace-pre-wrap font-medium">
+                                                                {payload.ai_response || evolutionPayload.text}
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                     <div>
                                                         <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Payload Completo (JSON)</h4>
                                                         <div className="bg-slate-900 rounded-xl p-4 overflow-x-auto relative group">
