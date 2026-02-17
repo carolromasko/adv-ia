@@ -189,6 +189,7 @@ export async function POST(req: Request) {
         };
 
         console.log("Enviando para Evolution:", evolutionUrl, evoBody);
+        console.log("Headers:", { 'Content-Type': 'application/json', 'apikey': config?.evolution_api_key ? '***' : 'VAZIO' });
 
         const evoResponse = await fetch(evolutionUrl, {
             method: 'POST',
@@ -199,13 +200,32 @@ export async function POST(req: Request) {
             body: JSON.stringify(evoBody)
         });
 
+        console.log("Evolution Response Status:", evoResponse.status, evoResponse.statusText);
+        const responseText = await evoResponse.text();
+        console.log("Evolution Response Body:", responseText);
+
         if (!evoResponse.ok) {
-            const errorText = await evoResponse.text();
-            console.error("Erro Evolution API:", errorText);
-            if (logId) await supabase.from('webhook_logs').update({ status: 'error_evolution_api', payload: { ...body, evolution_payload: evoBody, evolution_error: errorText } }).eq('id', logId);
+            console.error("Erro Evolution API - Status:", evoResponse.status);
+            console.error("Erro Evolution API - Body:", responseText);
+            if (logId) await supabase.from('webhook_logs').update({
+                status: 'error_evolution_api',
+                payload: {
+                    ...body,
+                    evolution_payload: evoBody,
+                    evolution_response_status: evoResponse.status,
+                    evolution_error: responseText
+                }
+            }).eq('id', logId);
         } else {
-            console.log("Envio Evolution OK");
-            if (logId) await supabase.from('webhook_logs').update({ status: 'sent_to_user', payload: { ...body, evolution_payload: evoBody } }).eq('id', logId);
+            console.log("Envio Evolution OK - Resposta:", responseText);
+            if (logId) await supabase.from('webhook_logs').update({
+                status: 'sent_to_user',
+                payload: {
+                    ...body,
+                    evolution_payload: evoBody,
+                    evolution_response: responseText
+                }
+            }).eq('id', logId);
         }
 
         return NextResponse.json({ success: true });
