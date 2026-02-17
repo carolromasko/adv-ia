@@ -9,10 +9,176 @@ const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
+// Função auxiliar para processar buffers expirados
+async function processExpiredBuffers() {
+    const now = new Date();
+
+    // Buscar buffers prontos para processar
+    const { data: expiredBuffers } = await supabase
+        .from('message_buffer')
+        .select('*')
+        .lte('should_process_after', now.toISOString());
+
+    if (!expiredBuffers || expiredBuffers.length === 0) return;
+
+    console.log(`Processando ${expiredBuffers.length} buffer(s) expirado(s)...`);
+
+    // Processar cada buffer
+    for (const buffer of expiredBuffers) {
+        try {
+            await processSingleBuffer(buffer);
+        } catch (error) {
+            console.error(`Erro ao processar buffer ${buffer.whatsapp_id}:`, error);
+        }
+    }
+}
+
+// Processar um buffer específico
+async function processSingleBuffer(buffer: any) {
+    const whatsappId = buffer.whatsapp_id;
+    const messages = buffer.messages || [];
+
+    if (messages.length === 0) {
+        await supabase.from('message_buffer').delete().eq('whatsapp_id', whatsappId);
+        return;
+    }
+
+    const combinedMessage = messages.join('\n\n');
+    console.log(`Processando buffer de ${whatsappId}: ${messages.length} mensagens`);
+
+    // Deletar buffer antes de processar
+    await supabase.from('message_buffer').delete().eq('whatsapp_id', whatsappId);
+
+    // Buscar configurações
+    const { data: config } = await supabase.from('configuracoes').select('*').single();
+    if (!config?.groq_api_key) {
+        console.error('Groq API Key não configurada');
+        return;
+    }
+
+    // Buscar histórico
+    const { data: history } = await supabase.from('mensagens')
+        .select('role, content')
+        .eq('whatsapp_id', whatsappId)
+        .order('created_at', { ascending: true });
+
+    const formattedHistory: any[] = history?.map(m => ({
+        role: m.role === 'model' ? 'assistant' : 'user',
+        content: m.content
+    })) || [];
+
+    // Chamar IA
+    const groq = createGroq({ apiKey: config.groq_api_key });
+
+    const systemPrompt = `Você é um assistente de vendas da ADV Digital. 
+        Seu objetivo é coletar dados para criar um site jurídico em 48h.
+        Colete os seguintes dados:
+        1. Nome do Advogado
+        2. Nome do Escritório
+        3. Especialidades
+        4. Principal Diferencial
+    
+        Seja formal, mas prestativo. Pergunte uma coisa por vez.
+        
+        IMPORTANTE:
+        Quando o usuário fornecer todos os 4 pontos acima, você DEVE retornar APENAS O SEGUINTE JSON no final da sua resposta, sem markdown (backticks):
+        
+        [FINALIZADO]
+        {
+            "nome_advogado": "Nome...",
+            "nome_escritorio": "Escritório...",
+            "especialidades": "Áreas...",
+            "diferencial": "Texto do diferencial..."
+        }
+        `;
+
+    let aiResponseText = "";
+    try {
+        const { text } = await generateText({
+            model: groq('openai/gpt-oss-120b'),
+            system: systemPrompt,
+            messages: [
+                ...formattedHistory,
+                { role: 'user', content: combinedMessage }
+            ],
+            temperature: 0.7,
+            maxTokens: 1024,
+        });
+        aiResponseText = text;
+    } catch (error: any) {
+        console.error("Erro na geração IA:", error);
+        aiResponseText = "Mensagem recebida, porém com erro. Nossa equipe verificará em breve.";
+    }
+
+    // Salvar histórico
+    await supabase.from('mensagens').insert([
+        { whatsapp_id: whatsappId, role: 'user', content: combinedMessage },
+        { whatsapp_id: whatsappId, role: 'model', content: aiResponseText }
+    ]);
+
+    let responseText = aiResponseText;
+
+    // Verificar se finalizou
+    if (aiResponseText.includes("[FINALIZADO]") || aiResponseText.includes("{")) {
+        try {
+            const jsonMatch = aiResponseText.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+                const jsonString = jsonMatch[0];
+                const leadData = JSON.parse(jsonString);
+
+                await supabase.from('leads').upsert({
+                    whatsapp_id: whatsappId,
+                    status: 'Briefing Concluído',
+                    nome_advogado: leadData.nome_advogado,
+                    nome_escritorio: leadData.nome_escritorio,
+                    especialidades: leadData.especialidades,
+                    diferencial: leadData.diferencial,
+                    updated_at: new Date()
+                }, { onConflict: 'whatsapp_id' });
+
+                responseText = aiResponseText.replace(jsonString, "").replace("[FINALIZADO]", "").trim();
+                if (!responseText) responseText = "Obrigado! Recebi todos os seus dados. Nossa equipe entrará em contato em breve.";
+            }
+        } catch (error) {
+            console.error("Erro ao fazer parse do JSON:", error);
+        }
+    } else {
+        await supabase.from('leads').upsert({
+            whatsapp_id: whatsappId,
+            status: 'Em Aberto',
+            updated_at: new Date()
+        }, { onConflict: 'whatsapp_id', ignoreDuplicates: true });
+    }
+
+    // Enviar resposta via Evolution API
+    const evolutionUrl = `${config?.evolution_api_url}/message/sendText/${config?.evolution_instance}`;
+    const number = whatsappId.replace('@s.whatsapp.net', '');
+
+    const evoBody = {
+        number: number,
+        text: responseText || "Recebido.",
+        delay: 1200
+    };
+
+    await fetch(evolutionUrl, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'apikey': config?.evolution_api_key || ""
+        },
+        body: JSON.stringify(evoBody)
+    });
+
+    console.log(`Buffer processado e resposta enviada para ${whatsappId}`);
+}
+
+
 export async function POST(req: Request) {
     try {
         const body = await req.json();
 
+        // PROCESSAR BUFFERS EXPIRADOS DE QUALQUER USUÁRIO (background check)
+        processExpiredBuffers().catch(err => console.error('Erro ao processar buffers expirados:', err));
 
         // 0. Log request for debugging
         const { data: logData } = await supabase.from('webhook_logs').insert({ payload: body, status: 'received' }).select().single();
