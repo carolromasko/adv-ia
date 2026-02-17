@@ -39,7 +39,7 @@ export async function POST(req: Request) {
         }
 
         const whatsappId = messageData.key.remoteJid;
-        const userMessage = messageData.message?.conversation || messageData.message?.extendedTextMessage?.text;
+        let userMessage = messageData.message?.conversation || messageData.message?.extendedTextMessage?.text;
 
         if (!userMessage) {
             console.log("Mensagem sem texto.");
