@@ -33,12 +33,19 @@ export async function POST(req: Request) {
             return NextResponse.json({ ok: true });
         }
 
-        if (messageData.key.fromMe) return NextResponse.json({ ok: true });
+        if (messageData.key.fromMe) {
+            if (logId) await supabase.from('webhook_logs').update({ status: 'ignored_from_me' }).eq('id', logId);
+            return NextResponse.json({ ok: true });
+        }
 
         const whatsappId = messageData.key.remoteJid;
         const userMessage = messageData.message?.conversation || messageData.message?.extendedTextMessage?.text;
 
-        if (!userMessage) return NextResponse.json({ ok: true });
+        if (!userMessage) {
+            console.log("Mensagem sem texto.");
+            if (logId) await supabase.from('webhook_logs').update({ status: 'ignored_no_text', payload: { ...body, message_data_debug: messageData } }).eq('id', logId);
+            return NextResponse.json({ ok: true });
+        }
 
         // 2. Buscar Configurações e Histórico no Supabase
         const { data: config } = await supabase.from('configuracoes').select('*').single();
