@@ -58,7 +58,8 @@ const App = () => {
         evolution_api_url: '',
         evolution_api_key: '',
         evolution_instance: '',
-        webhook_secret: ''
+        webhook_secret: '',
+        system_prompt: ''
     });
     const [webhookUrl, setWebhookUrl] = useState('');
 
@@ -113,7 +114,8 @@ const App = () => {
                 evolution_api_url: data.evolution_api_url || '',
                 evolution_api_key: data.evolution_api_key || '',
                 evolution_instance: data.evolution_instance || '',
-                webhook_secret: data.webhook_secret || ''
+                webhook_secret: data.webhook_secret || '',
+                system_prompt: data.system_prompt || ''
             });
         }
     };
@@ -524,6 +526,25 @@ const App = () => {
                                             />
                                         </div>
                                     </div>
+                                </div>
+
+                                <div className="pt-8 border-t border-slate-800">
+                                    <h2 className="text-xl font-bold mb-2 flex items-center gap-2">
+                                        <MessageSquare className="text-purple-500" size={20} /> Prompt do Sistema (IA)
+                                    </h2>
+                                    <p className="text-slate-400 text-sm mb-6">Configure o comportamento da IA. Este prompt define como ela interage com os leads.</p>
+
+                                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2 tracking-widest">System Prompt</label>
+                                    <textarea
+                                        value={config.system_prompt}
+                                        onChange={(e) => setConfig({ ...config, system_prompt: e.target.value })}
+                                        placeholder="Digite o prompt do sistema aqui..."
+                                        rows={15}
+                                        className="w-full bg-slate-800 border-none rounded-xl px-4 py-4 text-white font-mono text-sm focus:ring-2 focus:ring-purple-500 transition outline-none resize-none"
+                                    />
+                                    <p className="text-[11px] text-slate-500 mt-2">
+                                        💡 <strong>Dica:</strong> Mantenha o formato JSON de finalização <code className="bg-slate-700 px-1 rounded">[FINALIZADO]</code> no prompt para que o sistema reconheça quando o briefing está completo.
+                                    </p>
                                 </div>
 
                                 <div className="pt-10 flex items-center justify-between">
