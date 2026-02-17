@@ -4,7 +4,6 @@ import { createClient } from '@supabase/supabase-js';
 import { generateText } from 'ai';
 import { createGroq } from '@ai-sdk/groq';
 import { Redis } from '@upstash/redis';
-import { Client as QStashClient } from '@upstash/qstash';
 
 const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -14,10 +13,6 @@ const supabase = createClient(
 const redis = new Redis({
     url: process.env.UPSTASH_REDIS_REST_URL!,
     token: process.env.UPSTASH_REDIS_REST_TOKEN!,
-});
-
-const qstash = new QStashClient({
-    token: process.env.QSTASH_TOKEN!,
 });
 
 export async function POST(req: Request) {
@@ -34,11 +29,9 @@ export async function POST(req: Request) {
             return NextResponse.json({ ok: true });
         }
 
-        // Tenta extrair a mensagem de maneiras diferentes (array ou objeto direto)
         const messageData = body.data.messages?.[0] || body.data;
 
         if (!messageData || !messageData.key) {
-            console.log("Estrutura de mensagem inválida ou evento ignorado.");
             if (logId) await supabase.from('webhook_logs').update({ status: 'ignored_event' }).eq('id', logId);
             return NextResponse.json({ ok: true });
         }
@@ -52,65 +45,194 @@ export async function POST(req: Request) {
         let userMessage = messageData.message?.conversation || messageData.message?.extendedTextMessage?.text;
 
         if (!userMessage) {
-            console.log("Mensagem sem texto.");
             if (logId) await supabase.from('webhook_logs').update({ status: 'ignored_no_text', payload: { ...body, message_data_debug: messageData } }).eq('id', logId);
             return NextResponse.json({ ok: true });
         }
 
-        // SISTEMA DE BUFFER COM REDIS + QSTASH
+        // BUFFER COM REDIS - Processamento inline
         const DEBOUNCE_SECONDS = 12;
         const bufferKey = `buffer:${whatsappId}`;
-        const scheduleKey = `schedule:${whatsappId}`;
+        const timestampKey = `timestamp:${whatsappId}`;
 
-        // Adicionar mensagem ao buffer Redis
-        await redis.rpush(bufferKey, userMessage);
-        const bufferCount = await redis.llen(bufferKey);
+        // Verificar último timestamp
+        const lastTimestamp = await redis.get(timestampKey);
+        const now = Date.now();
+        const shouldProcess = lastTimestamp && (now - Number(lastTimestamp)) >= (DEBOUNCE_SECONDS * 1000);
 
-        console.log(`[Buffer] Mensagem adicionada. Total: ${bufferCount}`);
+        if (shouldProcess) {
+            // PROCESSAR IMEDIATAMENTE
+            const bufferedMessages = await redis.lrange(bufferKey, 0, -1);
+            const allMessages = [...bufferedMessages, userMessage];
+            const combinedMessage = allMessages.join('\n\n');
 
-        // Cancelar agendamento anterior se existir
-        const existingScheduleId = await redis.get(scheduleKey);
-        if (existingScheduleId) {
-            try {
-                await qstash.messages.delete(existingScheduleId as string);
-                console.log(`[QStash] Agendamento anterior cancelado: ${existingScheduleId}`);
-            } catch (error) {
-                console.log(`[QStash] Erro ao cancelar agendamento (pode já ter expirado):`, error);
-            }
+            console.log(`[Buffer] Processando ${allMessages.length} mensagens acumuladas`);
+
+            // Limpar buffer
+            await redis.del(bufferKey);
+            await redis.del(timestampKey);
+
+            // Processar (código inline)
+            await processMessages(whatsappId, combinedMessage, logId, body);
+
+            return NextResponse.json({ processed: true, messages_count: allMessages.length });
+        } else {
+            // ADICIONAR AO BUFFER
+            await redis.rpush(bufferKey, userMessage);
+            await redis.set(timestampKey, now);
+            await redis.expire(bufferKey, DEBOUNCE_SECONDS + 5);
+            await redis.expire(timestampKey, DEBOUNCE_SECONDS + 5);
+
+            const bufferCount = await redis.llen(bufferKey);
+            console.log(`[Buffer] Mensagem adicionada. Total: ${bufferCount}. Aguardando ${DEBOUNCE_SECONDS}s...`);
+
+            if (logId) await supabase.from('webhook_logs').update({
+                status: 'buffered',
+                payload: { ...body, buffer_count: bufferCount }
+            }).eq('id', logId);
+
+            return NextResponse.json({ buffered: true, buffer_count: bufferCount });
         }
-
-        // Agendar novo processamento para daqui 12 segundos
-        const processUrl = `${process.env.VERCEL_URL || 'https://adv-ia.vercel.app'}/api/process-buffer`;
-
-        const scheduleResponse = await qstash.publishJSON({
-            url: processUrl,
-            delay: DEBOUNCE_SECONDS,
-            body: { whatsappId },
-        });
-
-        // Salvar ID do agendamento
-        await redis.set(scheduleKey, scheduleResponse.messageId, { ex: DEBOUNCE_SECONDS + 5 });
-
-        console.log(`[QStash] Novo agendamento criado: ${scheduleResponse.messageId} (em ${DEBOUNCE_SECONDS}s)`);
-
-        if (logId) await supabase.from('webhook_logs').update({
-            status: 'buffered',
-            payload: {
-                ...body,
-                buffer_count: bufferCount,
-                schedule_id: scheduleResponse.messageId
-            }
-        }).eq('id', logId);
-
-        return NextResponse.json({
-            queued: true,
-            buffer_count: bufferCount,
-            will_process_in: `${DEBOUNCE_SECONDS}s`
-        });
 
     } catch (error: any) {
         console.error("Erro no Webhook:", error);
         await supabase.from('webhook_logs').insert({ payload: { error: error.message || String(error) }, status: 'critical_error' });
         return NextResponse.json({ error: "Internal Error" }, { status: 500 });
+    }
+}
+
+async function processMessages(whatsappId: string, combinedMessage: string, logId: number | undefined, body: any) {
+    // Buscar configurações
+    const { data: config } = await supabase.from('configuracoes').select('*').single();
+    if (!config?.groq_api_key) {
+        console.error('Groq API Key não configurada');
+        return;
+    }
+
+    if (logId) await supabase.from('webhook_logs').update({ status: 'generating_ai' }).eq('id', logId);
+
+    // Buscar histórico
+    const { data: history } = await supabase.from('mensagens')
+        .select('role, content')
+        .eq('whatsapp_id', whatsappId)
+        .order('created_at', { ascending: true });
+
+    const formattedHistory: any[] = history?.map(m => ({
+        role: m.role === 'model' ? 'assistant' : 'user',
+        content: m.content
+    })) || [];
+
+    // Chamar IA
+    const groq = createGroq({ apiKey: config.groq_api_key });
+
+    const systemPrompt = `Você é um assistente de vendas da ADV Digital. 
+        Seu objetivo é coletar dados para criar um site jurídico em 48h.
+        Colete os seguintes dados:
+        1. Nome do Advogado
+        2. Nome do Escritório
+        3. Especialidades
+        4. Principal Diferencial
+    
+        Seja formal, mas prestativo. Pergunte uma coisa por vez.
+        
+        IMPORTANTE:
+        Quando o usuário fornecer todos os 4 pontos acima, você DEVE retornar APENAS O SEGUINTE JSON no final da sua resposta, sem markdown (backticks):
+        
+        [FINALIZADO]
+        {
+            "nome_advogado": "Nome...",
+            "nome_escritorio": "Escritório...",
+            "especialidades": "Áreas...",
+            "diferencial": "Texto do diferencial..."
+        }
+        `;
+
+    let aiResponseText = "";
+    try {
+        const { text } = await generateText({
+            model: groq('openai/gpt-oss-120b'),
+            system: systemPrompt,
+            messages: [
+                ...formattedHistory,
+                { role: 'user', content: combinedMessage }
+            ],
+            temperature: 0.7,
+            maxTokens: 1024,
+        });
+        aiResponseText = text;
+
+        if (logId) await supabase.from('webhook_logs').update({ status: 'ai_generated', payload: { ...body, ai_response: aiResponseText } }).eq('id', logId);
+    } catch (error: any) {
+        console.error("Erro na geração IA:", error);
+        if (logId) await supabase.from('webhook_logs').update({ status: 'error_ai_generation', payload: { ...body, error: error.message } }).eq('id', logId);
+        aiResponseText = "Mensagem recebida, porém com erro. Nossa equipe verificará em breve.";
+    }
+
+    // Salvar histórico
+    await supabase.from('mensagens').insert([
+        { whatsapp_id: whatsappId, role: 'user', content: combinedMessage },
+        { whatsapp_id: whatsappId, role: 'model', content: aiResponseText }
+    ]);
+
+    let responseText = aiResponseText;
+
+    // Verificar se finalizou
+    if (aiResponseText.includes("[FINALIZADO]") || aiResponseText.includes("{")) {
+        try {
+            const jsonMatch = aiResponseText.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+                const jsonString = jsonMatch[0];
+                const leadData = JSON.parse(jsonString);
+
+                await supabase.from('leads').upsert({
+                    whatsapp_id: whatsappId,
+                    status: 'Briefing Concluído',
+                    nome_advogado: leadData.nome_advogado,
+                    nome_escritorio: leadData.nome_escritorio,
+                    especialidades: leadData.especialidades,
+                    diferencial: leadData.diferencial,
+                    updated_at: new Date()
+                }, { onConflict: 'whatsapp_id' });
+
+                responseText = aiResponseText.replace(jsonString, "").replace("[FINALIZADO]", "").trim();
+                if (!responseText) responseText = "Obrigado! Recebi todos os seus dados. Nossa equipe entrará em contato em breve.";
+            }
+        } catch (error) {
+            console.error("Erro ao fazer parse do JSON:", error);
+        }
+    } else {
+        await supabase.from('leads').upsert({
+            whatsapp_id: whatsappId,
+            status: 'Em Aberto',
+            updated_at: new Date()
+        }, { onConflict: 'whatsapp_id', ignoreDuplicates: true });
+    }
+
+    // Enviar resposta
+    if (logId) await supabase.from('webhook_logs').update({ status: 'sending_evolution' }).eq('id', logId);
+
+    const evolutionUrl = `${config?.evolution_api_url}/message/sendText/${config?.evolution_instance}`;
+    const number = whatsappId.replace('@s.whatsapp.net', '');
+
+    const evoBody = {
+        number: number,
+        text: responseText || "Recebido.",
+        delay: 1200
+    };
+
+    const evoResponse = await fetch(evolutionUrl, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'apikey': config?.evolution_api_key || ""
+        },
+        body: JSON.stringify(evoBody)
+    });
+
+    if (!evoResponse.ok) {
+        console.error('[Evolution] Erro:', await evoResponse.text());
+        if (logId) await supabase.from('webhook_logs').update({ status: 'error_evolution_api' }).eq('id', logId);
+    } else {
+        console.log(`[Evolution] Mensagem enviada para ${whatsappId}`);
+        if (logId) await supabase.from('webhook_logs').update({ status: 'sent_to_user' }).eq('id', logId);
     }
 }
