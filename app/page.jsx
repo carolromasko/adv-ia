@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import {
     Users, Settings, Globe, CheckCircle, Clock, Search, Save,
-    Database, ShieldCheck, LayoutDashboard, MessageSquare, AlertCircle, Zap, RefreshCw, Copy, Lock
+    Database, ShieldCheck, LayoutDashboard, MessageSquare, AlertCircle, Zap, RefreshCw, Copy, Lock, ChevronDown, ChevronUp
 } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 
@@ -16,6 +16,11 @@ const App = () => {
     const [loading, setLoading] = useState(false);
     const [leads, setLeads] = useState([]);
     const [webhookLogs, setWebhookLogs] = useState([]);
+    const [expandedLogs, setExpandedLogs] = useState({});
+
+    const toggleLog = (id) => {
+        setExpandedLogs(prev => ({ ...prev, [id]: !prev[id] }));
+    };
 
     // Autenticação
     const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -442,29 +447,92 @@ const App = () => {
                             </div>
 
                             <div className="space-y-4">
-                                {webhookLogs.map((log) => (
-                                    <div key={log.id} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                                        <div className="flex justify-between items-start mb-4">
-                                            <div className="flex items-center gap-3">
-                                                <div className="bg-blue-50 text-blue-600 p-2 rounded-lg">
-                                                    <MessageSquare size={16} />
+                                {webhookLogs.map((log) => {
+                                    // Extração segura dos dados para o resumo
+                                    const payload = log.payload || {};
+                                    const messageData = payload.data?.messages?.[0] || payload.data || {};
+                                    const key = messageData.key || {};
+                                    const pushName = messageData.pushName || 'Desconhecido';
+                                    const remoteJid = key.remoteJid || 'N/A';
+                                    const conversation = messageData.message?.conversation ||
+                                        messageData.message?.extendedTextMessage?.text ||
+                                        'Mensagem sem texto / Evento de sistema';
+                                    const eventType = payload.event || 'Evento desconhecido';
+
+                                    // Identifica se é envio ou recebimento
+                                    const isSent = log.status === 'sent_to_user';
+                                    const evolutionPayload = payload.evolution_payload || {};
+
+                                    return (
+                                        <div key={log.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden hover:shadow-md transition">
+                                            <div
+                                                className="p-6 cursor-pointer flex justify-between items-start gap-4"
+                                                onClick={() => toggleLog(log.id)}
+                                            >
+                                                <div className="flex items-start gap-4">
+                                                    <div className={`p-3 rounded-xl ${isSent ? 'bg-amber-50 text-amber-600' : 'bg-blue-50 text-blue-600'}`}>
+                                                        {isSent ? <Zap size={20} /> : <MessageSquare size={20} />}
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="font-bold text-slate-800 text-sm">
+                                                                {isSent ? 'Enviado para' : 'Recebido de'}: {isSent ? evolutionPayload.number : pushName}
+                                                            </span>
+                                                            <span className="text-[10px] bg-slate-100 px-2 py-0.5 rounded text-slate-500 font-mono">
+                                                                {isSent ? evolutionPayload.number : remoteJid}
+                                                            </span>
+                                                        </div>
+                                                        <p className="text-sm text-slate-600 font-medium line-clamp-2">
+                                                            {isSent ? evolutionPayload.text : conversation}
+                                                        </p>
+                                                        <div className="flex items-center gap-3 text-xs text-slate-400 mt-1">
+                                                            <span className="flex items-center gap-1">
+                                                                <Clock size={12} /> {formatDate(log.created_at)}
+                                                            </span>
+                                                            <span className="flex items-center gap-1">
+                                                                <Database size={12} /> ID: {log.id}
+                                                            </span>
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    <div className="text-xs font-bold text-slate-400 uppercase">ID: {log.id}</div>
-                                                    <div className="text-sm font-bold text-slate-700">{formatDate(log.created_at)}</div>
+
+                                                <div className="flex flex-col items-end gap-2">
+                                                    <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase border ${log.status === 'error_ai_generation' || log.status === 'error_evolution_api' ? 'bg-red-50 text-red-700 border-red-200' :
+                                                            log.status === 'sent_to_user' ? 'bg-green-50 text-green-700 border-green-200' :
+                                                                'bg-slate-50 text-slate-600 border-slate-200'
+                                                        }`}>
+                                                        {log.status}
+                                                    </span>
+                                                    {expandedLogs[log.id] ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
                                                 </div>
                                             </div>
-                                            <span className="px-3 py-1 bg-green-50 text-green-700 rounded-full text-[10px] font-bold uppercase border border-green-200">
-                                                {log.status}
-                                            </span>
+
+                                            {expandedLogs[log.id] && (
+                                                <div className="bg-slate-50 border-t border-slate-100 p-6 space-y-4">
+                                                    <div>
+                                                        <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Payload Completo (JSON)</h4>
+                                                        <div className="bg-slate-900 rounded-xl p-4 overflow-x-auto relative group">
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    navigator.clipboard.writeText(JSON.stringify(log.payload, null, 2));
+                                                                    alert('JSON copiado!');
+                                                                }}
+                                                                className="absolute top-2 right-2 p-2 bg-white/10 text-white rounded hover:bg-white/20 opacity-0 group-hover:opacity-100 transition"
+                                                                title="Copiar JSON"
+                                                            >
+                                                                <Copy size={14} />
+                                                            </button>
+                                                            <pre className="text-xs text-green-400 font-mono">
+                                                                {JSON.stringify(log.payload, null, 2)}
+                                                            </pre>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
-                                        <div className="bg-slate-900 rounded-xl p-4 overflow-x-auto">
-                                            <pre className="text-xs text-green-400 font-mono">
-                                                {JSON.stringify(log.payload, null, 2)}
-                                            </pre>
-                                        </div>
-                                    </div>
-                                ))}
+                                    )
+                                })}
 
                                 {webhookLogs.length === 0 && (
                                     <div className="text-center py-20 text-slate-400">
