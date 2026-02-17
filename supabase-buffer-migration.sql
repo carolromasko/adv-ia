@@ -8,8 +8,7 @@ CREATE TABLE IF NOT EXISTS message_buffer (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 -- Índice para buscar buffers prontos para processar
-CREATE INDEX IF NOT EXISTS idx_buffer_ready ON message_buffer(should_process_after)
-WHERE should_process_after <= NOW();
+CREATE INDEX IF NOT EXISTS idx_buffer_ready ON message_buffer(should_process_after);
 -- Comentários
 COMMENT ON TABLE message_buffer IS 'Buffer de mensagens acumuladas aguardando processamento em lote';
 COMMENT ON COLUMN message_buffer.should_process_after IS 'Timestamp após o qual as mensagens devem ser processadas';
