@@ -18,9 +18,14 @@ const App = () => {
     const [webhookLogs, setWebhookLogs] = useState([]);
     const [aiLogs, setAILogs] = useState([]);
     const [expandedLogs, setExpandedLogs] = useState({});
+    const [expandedLeads, setExpandedLeads] = useState({});
 
     const toggleLog = (id) => {
         setExpandedLogs(prev => ({ ...prev, [id]: !prev[id] }));
+    };
+
+    const toggleLead = (id) => {
+        setExpandedLeads(prev => ({ ...prev, [id]: !prev[id] }));
     };
 
     // Autenticação
@@ -312,48 +317,95 @@ const App = () => {
                                 </button>
                             </div>
 
-                            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                                {leads.length === 0 ? (
-                                    <div className="p-10 text-center text-slate-400">
-                                        Nenhum lead encontrado ainda.
-                                    </div>
-                                ) : (
-                                    <div className="overflow-x-auto">
-                                        <table className="w-full text-left">
-                                            <thead className="bg-slate-50 text-slate-400 text-[10px] uppercase font-bold border-b border-slate-100">
-                                                <tr>
-                                                    <th className="px-8 py-4">Advogado</th>
-                                                    <th className="px-8 py-4">Status</th>
-                                                    <th className="px-8 py-4">Data</th>
-                                                    <th className="px-8 py-4">Detalhes</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-slate-100">
-                                                {leads.map((l) => (
-                                                    <tr key={l.id} className="hover:bg-slate-50/50 transition">
-                                                        <td className="px-8 py-5">
-                                                            <div className="font-bold">{l.nome_advogado || 'Em Prospecção'}</div>
-                                                            <div className="text-xs text-slate-400">{l.nome_escritorio || l.whatsapp_id}</div>
-                                                        </td>
-                                                        <td className="px-8 py-5 text-sm">
-                                                            <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase ${l.status === 'Briefing Concluído'
-                                                                ? 'bg-green-50 text-green-700'
-                                                                : 'bg-amber-50 text-amber-700'
-                                                                }`}>
-                                                                {l.status}
+                            {leads.length === 0 ? (
+                                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-10 text-center text-slate-400">
+                                    Nenhum lead encontrado ainda.
+                                </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    {leads.map((lead) => (
+                                        <div key={lead.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden hover:shadow-md transition">
+                                            <div
+                                                className="p-6 cursor-pointer flex justify-between items-start gap-4"
+                                                onClick={() => toggleLead(lead.id)}
+                                            >
+                                                <div className="flex items-start gap-4">
+                                                    <div className={`p-3 rounded-xl ${lead.status === 'Briefing Concluído' ? 'bg-green-50 text-green-600' : 'bg-amber-50 text-amber-600'
+                                                        }`}>
+                                                        <Users size={20} />
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="font-bold text-slate-800 text-lg">
+                                                                {lead.nome_advogado || 'Em Prospecção'}
                                                             </span>
-                                                        </td>
-                                                        <td className="px-8 py-5 text-slate-400 text-xs">{formatDate(l.created_at)}</td>
-                                                        <td className="px-8 py-5 text-xs text-slate-500 max-w-xs truncate">
-                                                            {l.especialidades || '-'}
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                )}
-                            </div>
+                                                        </div>
+                                                        <p className="text-sm text-slate-500">
+                                                            {lead.nome_escritorio || lead.whatsapp_id}
+                                                        </p>
+                                                        <div className="flex items-center gap-3 text-xs text-slate-400 mt-1">
+                                                            <span className="flex items-center gap-1">
+                                                                <Clock size={12} /> {formatDate(lead.created_at)}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex flex-col items-end gap-2">
+                                                    <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase border ${lead.status === 'Briefing Concluído' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-amber-50 text-amber-700 border-amber-200'
+                                                        }`}>
+                                                        {lead.status}
+                                                    </span>
+                                                    {expandedLeads[lead.id] ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
+                                                </div>
+                                            </div>
+
+                                            {expandedLeads[lead.id] && (
+                                                <div className="bg-slate-50 border-t border-slate-100 p-6">
+                                                    <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">Detalhes do Briefing</h4>
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                        <div className="bg-white rounded-xl p-4 border border-slate-200">
+                                                            <div className="text-xs font-bold text-slate-400 uppercase mb-1">Nome do Advogado</div>
+                                                            <div className="text-sm font-bold text-slate-800">{lead.nome_advogado || '-'}</div>
+                                                        </div>
+                                                        <div className="bg-white rounded-xl p-4 border border-slate-200">
+                                                            <div className="text-xs font-bold text-slate-400 uppercase mb-1">Nome do Escritório</div>
+                                                            <div className="text-sm font-bold text-slate-800">{lead.nome_escritorio || '-'}</div>
+                                                        </div>
+                                                        <div className="bg-white rounded-xl p-4 border border-slate-200 md:col-span-2">
+                                                            <div className="text-xs font-bold text-slate-400 uppercase mb-1">Especialidades</div>
+                                                            <div className="text-sm text-slate-700 whitespace-pre-wrap">{lead.especialidades || '-'}</div>
+                                                        </div>
+                                                        <div className="bg-white rounded-xl p-4 border border-slate-200 md:col-span-2">
+                                                            <div className="text-xs font-bold text-slate-400 uppercase mb-1">Principal Diferencial</div>
+                                                            <div className="text-sm text-slate-700 whitespace-pre-wrap">{lead.diferencial || '-'}</div>
+                                                        </div>
+                                                        <div className="bg-white rounded-xl p-4 border border-slate-200">
+                                                            <div className="text-xs font-bold text-slate-400 uppercase mb-1">WhatsApp ID</div>
+                                                            <div className="text-xs font-mono text-slate-600">{lead.whatsapp_id}</div>
+                                                        </div>
+                                                        <div className="bg-white rounded-xl p-4 border border-slate-200">
+                                                            <div className="text-xs font-bold text-slate-400 uppercase mb-1">Última Atualização</div>
+                                                            <div className="text-sm text-slate-700">{formatDate(lead.updated_at)}</div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="mt-4 flex justify-end">
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setActiveTab('ai_logs');
+                                                            }}
+                                                            className="text-xs bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition flex items-center gap-2"
+                                                        >
+                                                            <MessageSquare size={14} /> Ver Conversa Completa
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -665,8 +717,8 @@ const App = () => {
                                             {messages.reverse().map((msg, idx) => (
                                                 <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-start' : 'justify-end'}`}>
                                                     <div className={`max-w-[80%] rounded-2xl p-4 ${msg.role === 'user'
-                                                            ? 'bg-blue-50 text-blue-900 border border-blue-200'
-                                                            : 'bg-amber-50 text-amber-900 border border-amber-200'
+                                                        ? 'bg-blue-50 text-blue-900 border border-blue-200'
+                                                        : 'bg-amber-50 text-amber-900 border border-amber-200'
                                                         }`}>
                                                         <div className="flex items-center gap-2 mb-2">
                                                             <div className={`w-2 h-2 rounded-full ${msg.role === 'user' ? 'bg-blue-500' : 'bg-amber-500'
