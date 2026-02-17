@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import {
     Users, Settings, Globe, CheckCircle, Clock, Search, Save,
-    Database, ShieldCheck, LayoutDashboard, MessageSquare, AlertCircle, Zap, RefreshCw, Copy, Lock, ChevronDown, ChevronUp
+    Database, ShieldCheck, LayoutDashboard, MessageSquare, AlertCircle, Zap, RefreshCw, Copy, Lock, ChevronDown, ChevronUp, Loader2, CheckCircle2, XCircle
 } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 
@@ -508,7 +508,65 @@ const App = () => {
                                             </div>
 
                                             {expandedLogs[log.id] && (
-                                                <div className="bg-slate-50 border-t border-slate-100 p-6 space-y-4">
+                                                <div className="bg-slate-50 border-t border-slate-100 p-6 space-y-6">
+
+                                                    {/* Timeline do Fluxo de Execução */}
+                                                    <div>
+                                                        <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">Fluxo de Processamento</h4>
+                                                        <div className="flex items-center justify-between relative">
+                                                            {/* Linha de conexão de fundo */}
+                                                            <div className="absolute left-0 top-1/2 w-full h-0.5 bg-slate-200 -z-0"></div>
+
+                                                            {['Recebido', 'Processando', 'IA', 'Enviado'].map((stepLabel, index) => {
+                                                                // Definição dos estados para cada passo baseada no log.status
+                                                                let stepStatus = 'pending'; // pending, active, completed, error, ignored
+
+                                                                const s = log.status;
+
+                                                                // Lógica simplificada de estado
+                                                                if (index === 0) { // Recebido
+                                                                    if (s.includes('ignored')) stepStatus = 'ignored';
+                                                                    else stepStatus = 'completed';
+                                                                } else if (index === 1) { // Processando (Dados)
+                                                                    if (s === 'received') stepStatus = 'active';
+                                                                    else if (s === 'fetching_data') stepStatus = 'active';
+                                                                    else if (s === 'error_no_api_key') stepStatus = 'error';
+                                                                    else if (['generating_ai', 'ai_generated', 'sending_evolution', 'sent_to_user', 'error_ai_generation', 'error_evolution_api'].includes(s)) stepStatus = 'completed';
+                                                                    else if (s.includes('ignored')) stepStatus = 'ignored';
+                                                                } else if (index === 2) { // IA
+                                                                    if (s === 'generating_ai') stepStatus = 'active';
+                                                                    else if (s === 'error_ai_generation') stepStatus = 'error';
+                                                                    else if (['ai_generated', 'sending_evolution', 'sent_to_user', 'error_evolution_api'].includes(s)) stepStatus = 'completed';
+                                                                } else if (index === 3) { // Enviado
+                                                                    if (s === 'sending_evolution' || s === 'ai_generated') stepStatus = 'active';
+                                                                    else if (s === 'error_evolution_api') stepStatus = 'error';
+                                                                    else if (s === 'sent_to_user') stepStatus = 'completed';
+                                                                }
+
+                                                                return (
+                                                                    <div key={index} className="relative z-10 flex flex-col items-center gap-2 bg-slate-50 px-2">
+                                                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 transition-all ${stepStatus === 'completed' ? 'bg-green-500 border-green-500 text-white' :
+                                                                                stepStatus === 'error' ? 'bg-red-500 border-red-500 text-white' :
+                                                                                    stepStatus === 'active' ? 'bg-blue-500 border-blue-500 text-white animate-pulse' :
+                                                                                        stepStatus === 'ignored' ? 'bg-slate-200 border-slate-300 text-slate-400' :
+                                                                                            'bg-white border-slate-300 text-slate-300'
+                                                                            }`}>
+                                                                            {stepStatus === 'completed' && <CheckCircle2 size={16} />}
+                                                                            {stepStatus === 'error' && <XCircle size={16} />}
+                                                                            {stepStatus === 'active' && <Loader2 size={16} className="animate-spin" />}
+                                                                            {stepStatus === 'ignored' && <XCircle size={16} />}
+                                                                            {stepStatus === 'pending' && <span className="text-xs font-bold text-slate-300">{index + 1}</span>}
+                                                                        </div>
+                                                                        <span className={`text-[10px] font-bold uppercase tracking-wider ${stepStatus === 'completed' ? 'text-green-600' :
+                                                                                stepStatus === 'error' ? 'text-red-600' :
+                                                                                    stepStatus === 'active' ? 'text-blue-600' :
+                                                                                        'text-slate-400'
+                                                                            }`}>{stepLabel}</span>
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    </div>
                                                     {(payload.ai_response || evolutionPayload.text) && (
                                                         <div className="mb-4">
                                                             <h4 className="text-xs font-bold text-amber-600 uppercase tracking-wider mb-2 flex items-center gap-2">

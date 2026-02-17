@@ -48,6 +48,8 @@ export async function POST(req: Request) {
         }
 
         // 2. Buscar Configurações e Histórico no Supabase
+        if (logId) await supabase.from('webhook_logs').update({ status: 'fetching_data' }).eq('id', logId);
+
         const { data: config } = await supabase.from('configuracoes').select('*').single();
 
         if (!config?.groq_api_key) {
@@ -69,6 +71,8 @@ export async function POST(req: Request) {
         })) || [];
 
         // 3. Chamar Groq (openai/gpt-oss-120b) via AI SDK
+        if (logId) await supabase.from('webhook_logs').update({ status: 'generating_ai' }).eq('id', logId);
+
         const groq = createGroq({
             apiKey: config.groq_api_key,
         });
@@ -111,16 +115,17 @@ export async function POST(req: Request) {
                 maxTokens: 1024,
             });
             aiResponseText = text;
+
+            // Atualiza log com sucesso da IA, salvando a resposta gerada para debug
+            if (logId) await supabase.from('webhook_logs').update({ status: 'ai_generated', payload: { ...body, ai_response: aiResponseText } }).eq('id', logId);
         } catch (aiError: any) {
             console.error("Erro na Geração da IA:", aiError);
             if (logId) await supabase.from('webhook_logs').update({ status: 'error_ai_generation', payload: { ...body, error: aiError.message || String(aiError) } }).eq('id', logId);
-            return NextResponse.json({ error: "AI Generation Failed" }, { status: 500 });
+            // Define mensagem de fallback ao invés de retornar erro
+            aiResponseText = "Mensagem recebida, porém com erro. Nossa equipe verificará em breve.";
         }
 
-        console.log("Resposta IA:", aiResponseText);
 
-        // Atualiza log com sucesso da IA, salvando a resposta gerada para debug
-        if (logId) await supabase.from('webhook_logs').update({ status: 'ai_generated', payload: { ...body, ai_response: aiResponseText } }).eq('id', logId);
 
 
 
@@ -170,6 +175,8 @@ export async function POST(req: Request) {
         }
 
         // 5. Responder via Evolution API (com delay)
+        if (logId) await supabase.from('webhook_logs').update({ status: 'sending_evolution' }).eq('id', logId);
+
         const evolutionUrl = `${config?.evolution_api_url}/message/sendText/${config?.evolution_instance}`;
 
         // Remover sufixo do número se existir, para garantir compatibilidade
