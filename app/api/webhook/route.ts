@@ -57,7 +57,20 @@ export async function POST(req: Request) {
         // Verificar último timestamp
         const lastTimestamp = await redis.get(timestampKey);
         const now = Date.now();
-        const shouldProcess = lastTimestamp && (now - Number(lastTimestamp)) >= (DEBOUNCE_SECONDS * 1000);
+
+        if (!lastTimestamp) {
+            // PRIMEIRA MENSAGEM - Processar imediatamente
+            console.log(`[Buffer] Primeira mensagem de ${whatsappId} - processando imediatamente`);
+            await processMessages(whatsappId, userMessage, logId, body);
+
+            // Marcar timestamp para próximas mensagens
+            await redis.set(timestampKey, now);
+            await redis.expire(timestampKey, DEBOUNCE_SECONDS + 5);
+
+            return NextResponse.json({ processed: true, first_message: true });
+        }
+
+        const shouldProcess = (now - Number(lastTimestamp)) >= (DEBOUNCE_SECONDS * 1000);
 
         if (shouldProcess) {
             // PROCESSAR IMEDIATAMENTE
@@ -67,9 +80,10 @@ export async function POST(req: Request) {
 
             console.log(`[Buffer] Processando ${allMessages.length} mensagens acumuladas`);
 
-            // Limpar buffer
+            // Limpar buffer e atualizar timestamp
             await redis.del(bufferKey);
-            await redis.del(timestampKey);
+            await redis.set(timestampKey, now);
+            await redis.expire(timestampKey, DEBOUNCE_SECONDS + 5);
 
             // Processar (código inline)
             await processMessages(whatsappId, combinedMessage, logId, body);
