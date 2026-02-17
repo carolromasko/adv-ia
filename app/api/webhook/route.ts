@@ -201,29 +201,29 @@ export async function POST(req: Request) {
         });
 
         console.log("Evolution Response Status:", evoResponse.status, evoResponse.statusText);
-        const responseText = await evoResponse.text();
-        console.log("Evolution Response Body:", responseText);
+        const evoResponseText = await evoResponse.text();
+        console.log("Evolution Response Body:", evoResponseText);
 
         if (!evoResponse.ok) {
             console.error("Erro Evolution API - Status:", evoResponse.status);
-            console.error("Erro Evolution API - Body:", responseText);
+            console.error("Erro Evolution API - Body:", evoResponseText);
             if (logId) await supabase.from('webhook_logs').update({
                 status: 'error_evolution_api',
                 payload: {
                     ...body,
                     evolution_payload: evoBody,
                     evolution_response_status: evoResponse.status,
-                    evolution_error: responseText
+                    evolution_error: evoResponseText
                 }
             }).eq('id', logId);
         } else {
-            console.log("Envio Evolution OK - Resposta:", responseText);
+            console.log("Envio Evolution OK - Resposta:", evoResponseText);
             if (logId) await supabase.from('webhook_logs').update({
                 status: 'sent_to_user',
                 payload: {
                     ...body,
                     evolution_payload: evoBody,
-                    evolution_response: responseText
+                    evolution_response: evoResponseText
                 }
             }).eq('id', logId);
         }
