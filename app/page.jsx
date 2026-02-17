@@ -16,6 +16,7 @@ const App = () => {
     const [loading, setLoading] = useState(false);
     const [leads, setLeads] = useState([]);
     const [webhookLogs, setWebhookLogs] = useState([]);
+    const [aiLogs, setAILogs] = useState([]);
     const [expandedLogs, setExpandedLogs] = useState({});
 
     const toggleLog = (id) => {
@@ -77,8 +78,11 @@ const App = () => {
     useEffect(() => {
         if (activeTab === 'webhooks') {
             fetchWebhookLogs();
-            const interval = setInterval(fetchWebhookLogs, 5000); // Auto-refresh a cada 5s
+            const interval = setInterval(fetchWebhookLogs, 5000);
             return () => clearInterval(interval);
+        }
+        if (activeTab === 'ai_logs') {
+            fetchAILogs();
         }
     }, [activeTab]);
 
@@ -118,6 +122,17 @@ const App = () => {
 
         if (data) setWebhookLogs(data);
         if (error) console.error("Erro ao buscar logs:", error);
+    };
+
+    const fetchAILogs = async () => {
+        const { data, error } = await supabase
+            .from('mensagens')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(200);
+
+        if (data) setAILogs(data);
+        if (error) console.error("Erro ao buscar logs de IA:", error);
     };
 
     const handleSaveConfig = async (e) => {
@@ -227,6 +242,12 @@ const App = () => {
                     >
                         <ShieldCheck size={20} /> Monitor Webhook
                     </button>
+                    <button
+                        onClick={() => setActiveTab('ai_logs')}
+                        className={`w-full flex items-center gap-3 p-3 rounded-xl transition ${activeTab === 'ai_logs' ? 'bg-amber-500 text-white' : 'text-slate-400 hover:bg-slate-800'}`}
+                    >
+                        <MessageSquare size={20} /> Logs de IA
+                    </button>
                 </nav>
 
                 <div className="mt-auto p-4 bg-slate-800/40 rounded-2xl border border-slate-700/50 flex flex-col gap-3">
@@ -255,6 +276,7 @@ const App = () => {
                         {activeTab === 'dashboard' && 'Fila de Produção'}
                         {activeTab === 'integrations' && 'Configurações'}
                         {activeTab === 'webhooks' && 'Monitor de Webhook'}
+                        {activeTab === 'ai_logs' && 'Histórico de Conversas IA'}
                     </h1>
                     <div className="flex items-center gap-4">
                         <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse"></div>
@@ -546,10 +568,10 @@ const App = () => {
                                                                 return (
                                                                     <div key={index} className="relative z-10 flex flex-col items-center gap-2 bg-slate-50 px-2">
                                                                         <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 transition-all ${stepStatus === 'completed' ? 'bg-green-500 border-green-500 text-white' :
-                                                                                stepStatus === 'error' ? 'bg-red-500 border-red-500 text-white' :
-                                                                                    stepStatus === 'active' ? 'bg-blue-500 border-blue-500 text-white animate-pulse' :
-                                                                                        stepStatus === 'ignored' ? 'bg-slate-200 border-slate-300 text-slate-400' :
-                                                                                            'bg-white border-slate-300 text-slate-300'
+                                                                            stepStatus === 'error' ? 'bg-red-500 border-red-500 text-white' :
+                                                                                stepStatus === 'active' ? 'bg-blue-500 border-blue-500 text-white animate-pulse' :
+                                                                                    stepStatus === 'ignored' ? 'bg-slate-200 border-slate-300 text-slate-400' :
+                                                                                        'bg-white border-slate-300 text-slate-300'
                                                                             }`}>
                                                                             {stepStatus === 'completed' && <CheckCircle2 size={16} />}
                                                                             {stepStatus === 'error' && <XCircle size={16} />}
@@ -558,9 +580,9 @@ const App = () => {
                                                                             {stepStatus === 'pending' && <span className="text-xs font-bold text-slate-300">{index + 1}</span>}
                                                                         </div>
                                                                         <span className={`text-[10px] font-bold uppercase tracking-wider ${stepStatus === 'completed' ? 'text-green-600' :
-                                                                                stepStatus === 'error' ? 'text-red-600' :
-                                                                                    stepStatus === 'active' ? 'text-blue-600' :
-                                                                                        'text-slate-400'
+                                                                            stepStatus === 'error' ? 'text-red-600' :
+                                                                                stepStatus === 'active' ? 'text-blue-600' :
+                                                                                    'text-slate-400'
                                                                             }`}>{stepLabel}</span>
                                                                     </div>
                                                                 );
@@ -605,6 +627,68 @@ const App = () => {
                                 {webhookLogs.length === 0 && (
                                     <div className="text-center py-20 text-slate-400">
                                         Nenhum log registrado ainda.
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'ai_logs' && (
+                        <div className="space-y-6">
+                            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex justify-between items-center">
+                                <div>
+                                    <h2 className="text-xl font-bold text-slate-800">Conversas com IA</h2>
+                                    <p className="text-sm text-slate-500">Histórico completo das interações entre usuários e a IA.</p>
+                                </div>
+                                <button onClick={fetchAILogs} className="p-2 hover:bg-slate-100 rounded-lg text-slate-500 transition">
+                                    <RefreshCw size={20} />
+                                </button>
+                            </div>
+
+                            <div className="space-y-6">
+                                {Object.entries(
+                                    aiLogs.reduce((acc, msg) => {
+                                        if (!acc[msg.whatsapp_id]) acc[msg.whatsapp_id] = [];
+                                        acc[msg.whatsapp_id].push(msg);
+                                        return acc;
+                                    }, {})
+                                ).map(([whatsappId, messages]) => (
+                                    <div key={whatsappId} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                                        <div className="bg-gradient-to-r from-amber-500 to-amber-600 p-4 text-white">
+                                            <div className="flex items-center gap-2">
+                                                <Users size={16} />
+                                                <span className="font-bold text-sm">{whatsappId}</span>
+                                            </div>
+                                            <div className="text-xs opacity-80 mt-1">{messages.length} mensagens</div>
+                                        </div>
+                                        <div className="p-6 space-y-4 max-h-96 overflow-y-auto">
+                                            {messages.reverse().map((msg, idx) => (
+                                                <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-start' : 'justify-end'}`}>
+                                                    <div className={`max-w-[80%] rounded-2xl p-4 ${msg.role === 'user'
+                                                            ? 'bg-blue-50 text-blue-900 border border-blue-200'
+                                                            : 'bg-amber-50 text-amber-900 border border-amber-200'
+                                                        }`}>
+                                                        <div className="flex items-center gap-2 mb-2">
+                                                            <div className={`w-2 h-2 rounded-full ${msg.role === 'user' ? 'bg-blue-500' : 'bg-amber-500'
+                                                                }`}></div>
+                                                            <span className="text-[10px] font-bold uppercase tracking-wider opacity-60">
+                                                                {msg.role === 'user' ? 'Usuário' : 'IA'}
+                                                            </span>
+                                                            <span className="text-[9px] opacity-40 ml-auto">
+                                                                {formatDate(msg.created_at)}
+                                                            </span>
+                                                        </div>
+                                                        <p className="text-sm whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ))}
+
+                                {aiLogs.length === 0 && (
+                                    <div className="text-center py-20 text-slate-400">
+                                        Nenhuma conversa registrada ainda.
                                     </div>
                                 )}
                             </div>
