@@ -175,7 +175,7 @@ async function processMessages(whatsappId: string, combinedMessage: string, logI
     let aiResponseText = "";
     try {
         const { text } = await generateText({
-            model: groq('openai/gpt-oss-120b'),
+            model: groq('llama-3.1-70b-versatile'),
             system: systemPrompt,
             messages: [
                 ...formattedHistory,
