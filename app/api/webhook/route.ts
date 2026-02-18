@@ -175,7 +175,7 @@ async function processMessages(whatsappId: string, combinedMessage: string, logI
     let aiResponseText = "";
     try {
         const { text } = await generateText({
-            model: groq('llama-3.1-70b-versatile'),
+            model: groq('llama-3.3-70b-versatile'),
             system: systemPrompt,
             messages: [
                 ...formattedHistory,
@@ -188,9 +188,14 @@ async function processMessages(whatsappId: string, combinedMessage: string, logI
 
         if (logId) await supabase.from('webhook_logs').update({ status: 'ai_generated', payload: { ...body, ai_response: aiResponseText } }).eq('id', logId);
     } catch (error: any) {
-        console.error("Erro na geração IA:", error);
-        if (logId) await supabase.from('webhook_logs').update({ status: 'error_ai_generation', payload: { ...body, error: error.message } }).eq('id', logId);
-        aiResponseText = "Mensagem recebida, porém com erro. Nossa equipe verificará em breve.";
+        console.error("ERRO CRÍTICO NA GROQ AI:", error);
+        // Tentar capturar detalhes da resposta se existirem
+        if (error.response) {
+            console.error("Detalhes do erro Groq:", await error.response.text());
+        }
+
+        if (logId) await supabase.from('webhook_logs').update({ status: 'error_ai_generation', payload: { ...body, error: error.message, error_details: error } }).eq('id', logId);
+        aiResponseText = "Desculpe, estou passando por uma manutenção momentânea na minha IA. Nossa equipe já foi notificada.";
     }
 
     // Salvar histórico

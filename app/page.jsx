@@ -453,7 +453,7 @@ const App = () => {
                                     <h2 className="text-xl font-bold mb-2 flex items-center gap-2">
                                         <Zap className="text-amber-500" size={20} /> Integração IA
                                     </h2>
-                                    <p className="text-slate-400 text-sm mb-6">Configure sua chave da Groq Cloud para processar as mensagens do WhatsApp (Modelo: llama-3.1-70b-versatile).</p>
+                                    <p className="text-slate-400 text-sm mb-6">Configure sua chave da Groq Cloud para processar as mensagens do WhatsApp (Modelo: llama-3.3-70b-versatile).</p>
                                     <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2 tracking-widest">Groq API Key</label>
                                     <input
                                         type="password"
