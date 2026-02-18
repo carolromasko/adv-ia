@@ -244,7 +244,7 @@ async function processMessages(whatsappId: string, combinedMessage: string, logI
     // Enviar resposta
     if (logId) await supabase.from('webhook_logs').update({ status: 'sending_evolution' }).eq('id', logId);
 
-    const evolutionUrl = `${config?.evolution_api_url} /message/sendText / ${config?.evolution_instance} `;
+    const evolutionUrl = `${config?.evolution_api_url}/message/sendText/${config?.evolution_instance}`;
     const number = whatsappId.replace('@s.whatsapp.net', '');
 
     // Converter Markdown para formatação WhatsApp antes de enviar
