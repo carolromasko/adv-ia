@@ -58,6 +58,24 @@ export async function POST(req: Request) {
             return NextResponse.json({ ok: true });
         }
 
+        // VERIFICAÇÃO DE TIMESTAMP (Evitar loop de retry)
+        // Ignorar mensagens com mais de 5 minutos (300 segundos) de atraso
+        const messageTimestamp = messageData.messageTimestamp;
+        if (messageTimestamp) {
+            const messageTime = typeof messageTimestamp === 'number' ? messageTimestamp * 1000 : Number(messageTimestamp) * 1000;
+            const now = Date.now();
+            const differenceInSeconds = (now - messageTime) / 1000;
+
+            if (differenceInSeconds > 300) { // 5 minutos
+                console.log(`[Webhook] Mensagem antiga ignorada. Atraso de ${differenceInSeconds.toFixed(0)}s`);
+                if (logId) await supabase.from('webhook_logs').update({
+                    status: 'ignored_old_message',
+                    payload: { ...body, delay_seconds: differenceInSeconds }
+                }).eq('id', logId);
+                return NextResponse.json({ ok: true, reason: 'old_message' });
+            }
+        }
+
         const whatsappId = messageData.key.remoteJid;
         let userMessage = messageData.message?.conversation || messageData.message?.extendedTextMessage?.text;
 
